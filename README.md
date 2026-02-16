@@ -41,3 +41,5 @@ RST:1234  → Restart ESP32
 3. 開啟網頁
 4. 點擊頁面授權 Serial
 5. 點擊畫面開始控制
+# 致謝
+## 本作品由[yume-chan/ms2109-player](https://github.com/yume-chan/ms2109-player)進行修改。
