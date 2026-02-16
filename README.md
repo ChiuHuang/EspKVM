@@ -13,7 +13,7 @@ EspKVM 是一個使用 React + ESP32-S3 製作的簡易 KVM 。
 * 另一個 USB 直接接到被控端電腦，模擬 HID 裝置
 
 > [!NOTE]
-> 我在這使用的是MS2130 在選擇相機時會自動對照pid vid，(345f:2130)
+> 我在這使用的是MS2130 在選擇相機時會自動對照pid vid(345f:2130)，
 > 如果沒有出現影像可以試著修改 [src/App.tsx](https://github.com/ChiuHuang/EspKVM/blob/main/src/App.tsx#L341)。
 
 ## 功能
