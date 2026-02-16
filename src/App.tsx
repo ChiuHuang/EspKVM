@@ -37,8 +37,7 @@ async function requestMediaDevicePermission() {
 function App() {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [status, setStatus] = useState('Disconnected');
-  const [sensitivity, setSensitivity] = useState(0.4); // 0.5 = 50% speed
+  const [sensitivity] = useState(0.4); // 0.5 = 50% speed
   const serialConnection = useRef<SerialConnection | null>(null);
   const keysPressed = useRef<Set<number>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -99,7 +98,6 @@ function App() {
   // Connect to Serial ESP32
   const handleConnect = useCallback(async () => {
     setConnecting(true);
-    setStatus('Connecting to Serial...');
     try {
       // Check if Web Serial API is available
       if (!(navigator as any).serial) {
@@ -123,7 +121,6 @@ function App() {
       }
       
       setConnected(true);
-      setStatus('Connected via Serial');
       console.log('Serial connected');
       setConnecting(false);
       
@@ -131,7 +128,6 @@ function App() {
     } catch (error) {
       console.error('Connection error:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      setStatus(`Connection failed: ${errorMsg}`);
       setConnecting(false);
     }
   }, []);
@@ -157,12 +153,14 @@ function App() {
 
   // Lock pointer to video element
   useEffect(() => {
-    if (!connected || !videoRef.current) return;
+    const videoEle = videoRef.current;
+
+    if (!connected || !videoEle) return;
 
     const lockPointer = async () => {
-      if (videoRef.current) {
+      if (videoEle) {
         try {
-          await videoRef.current.requestPointerLock();
+          await videoEle.requestPointerLock();
         } catch (error) {
           console.error('Pointer lock failed:', error);
         }
@@ -170,7 +168,7 @@ function App() {
     };
 
     // Lock on click
-    videoRef.current.addEventListener('click', lockPointer);
+    videoEle.addEventListener('click', lockPointer);
 
     // Unlock on ESC key
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -181,8 +179,8 @@ function App() {
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('click', lockPointer);
+      if (videoEle) {
+        videoEle.removeEventListener('click', lockPointer);
       }
       document.removeEventListener('keydown', handleKeyDown);
     };
