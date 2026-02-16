@@ -10,7 +10,7 @@ interface SerialConnection {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const MODE_LIST = [
   { width: 1920, height: 1080, frameRate: 60 },
-  { width: 1920, height: 1080, frameRate: 60 },
+  { width: 3840, height: 2160, frameRate: 30 },
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
