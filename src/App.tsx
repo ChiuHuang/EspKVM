@@ -127,7 +127,6 @@ function App() {
       
     } catch (error) {
       console.error('Connection error:', error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
       setConnecting(false);
     }
   }, []);
