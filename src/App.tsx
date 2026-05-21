@@ -297,6 +297,17 @@ function App() {
           sendCommand('RST:1234');
           return;
       }   
+      
+      if (e.shiftKey && e.altKey && e.key === 'F10') {
+          e.preventDefault();
+          sendCommand('P:81'); // powerdown
+          return;
+      }
+      if (e.shiftKey && e.altKey && e.key === 'F11') {
+          e.preventDefault();
+          sendCommand('P:83'); // Direct HID Code: Generic Desktop System Wake Up
+          return;
+      }
 
       if (modifiers.length > 0 && keyCode > 31 && keyCode < 127) {
         e.preventDefault(); // Prevent browser shortcuts
