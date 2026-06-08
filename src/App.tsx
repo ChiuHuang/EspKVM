@@ -283,17 +283,10 @@ function App() {
 useEffect(() => {
   if (!connected) return;
 
-  // HID codes for modifier keys — sent directly, bypass Arduino lookup
-  const HID_LCTRL  = 224;
-  const HID_LSHIFT = 225;
-  const HID_LALT   = 226;
-  const HID_LGUI   = 227;
-  const HID_RSHIFT = 229;
-
   const handleKeyDown = (e: KeyboardEvent) => {
     const keyCode = e.keyCode;
 
-    // Special combos — intercept before anything else
+    // Special combos
     if (e.shiftKey && e.key === 'F12') {
       e.preventDefault();
       sendCommand('RST:1234');
@@ -301,43 +294,51 @@ useEffect(() => {
     }
     if (e.shiftKey && e.altKey && e.key === 'F10') {
       e.preventDefault();
-      sendCommand('P:81'); // Power down (raw HID, sent as-is)
+      sendCommand('P:81');
       return;
     }
     if (e.shiftKey && e.altKey && e.key === 'F11') {
       e.preventDefault();
-      sendCommand('P:83'); // System wake-up (raw HID)
+      sendCommand('P:83');
       return;
     }
 
-    // Don't re-send if already held
+    // Ctrl+letter → send raw ASCII control character via T:
+    // ASCII ctrl chars = letter_value - 64, e.g. Ctrl+C = 67-64 = 3
+    if (e.ctrlKey && keyCode >= 65 && keyCode <= 90) {
+      e.preventDefault();
+      const ctrlChar = String.fromCharCode(keyCode - 64);
+      sendCommand(`T:${ctrlChar}`);
+      return;
+    }
+
+    // Ctrl+[ = ESC (0x1B), Ctrl+\ = 0x1C, Ctrl+] = 0x1D
+    if (e.ctrlKey && (keyCode === 219 || keyCode === 220 || keyCode === 221)) {
+      e.preventDefault();
+      const ctrlChar = String.fromCharCode(keyCode - 192);
+      sendCommand(`T:${ctrlChar}`);
+      return;
+    }
+
+    // Don't repeat held keys
     if (keysPressed.current.has(keyCode)) return;
     keysPressed.current.add(keyCode);
 
-    // Send modifier keys using their HID codes directly
-    // (Arduino keycodeToHID also handles these, but being explicit is safer)
-    if (keyCode === 16) { sendCommand(`P:${HID_LSHIFT}`); return; }
-    if (keyCode === 17) { sendCommand(`P:${HID_LCTRL}`);  return; }
-    if (keyCode === 18) { sendCommand(`P:${HID_LALT}`);   return; }
-    if (keyCode === 91 || keyCode === 93) { sendCommand(`P:${HID_LGUI}`); return; }
+    // Modifier-only keys
+    if (keyCode === 17) { sendCommand('P:17'); return; }
+    if (keyCode === 16) { sendCommand('P:16'); return; }
+    if (keyCode === 18) { sendCommand('P:18'); return; }
+    if (keyCode === 91 || keyCode === 93) { sendCommand('P:91'); return; }
 
-    // Prevent browser from consuming Ctrl/Alt shortcuts
-    if (e.ctrlKey || e.altKey || e.metaKey) e.preventDefault();
-
-    // Send modifiers that are currently held but not the key itself
-    // (e.g. user holds Ctrl, presses C — send Ctrl before C)
-    if (e.ctrlKey)  sendCommand(`P:${HID_LCTRL}`);
-    if (e.altKey)   sendCommand(`P:${HID_LALT}`);
-    if (e.metaKey)  sendCommand(`P:${HID_LGUI}`);
-
-    // Shift: send BEFORE the key so the HID host applies shift correctly.
-    // Use e.getModifierState to distinguish physical left/right shift if needed.
+    // Alt combos: prevent browser default, send mod+key
+    if (e.altKey) {
+      e.preventDefault();
+      sendCommand('P:18');
+    }
     if (e.shiftKey) {
-      const shiftHid = e.location === 2 ? HID_RSHIFT : HID_LSHIFT;
-      sendCommand(`P:${shiftHid}`);
+      sendCommand('P:16');
     }
 
-    // Send the key itself — Arduino maps keyCode → HID
     sendCommand(`P:${keyCode}`);
   };
 
@@ -345,13 +346,16 @@ useEffect(() => {
     const keyCode = e.keyCode;
     keysPressed.current.delete(keyCode);
 
-    // Modifier keys: release by HID code
-    if (keyCode === 16) { sendCommand(`R:${HID_LSHIFT}`); return; }
-    if (keyCode === 17) { sendCommand(`R:${HID_LCTRL}`);  return; }
-    if (keyCode === 18) { sendCommand(`R:${HID_LALT}`);   return; }
-    if (keyCode === 91 || keyCode === 93) { sendCommand(`R:${HID_LGUI}`); return; }
+    if (keyCode === 17) { sendCommand('R:17'); return; }
+    if (keyCode === 16) { sendCommand('R:16'); return; }
+    if (keyCode === 18) { sendCommand('R:18'); return; }
+    if (keyCode === 91 || keyCode === 93) { sendCommand('R:91'); return; }
 
     sendCommand(`R:${keyCode}`);
+    if (!e.ctrlKey)  sendCommand('R:17');
+    if (!e.shiftKey) sendCommand('R:16');
+    if (!e.altKey)   sendCommand('R:18');
+    if (!e.metaKey)  sendCommand('R:91');
   };
 
   window.addEventListener('keydown', handleKeyDown);
