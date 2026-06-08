@@ -279,69 +279,88 @@ function App() {
     return () => window.removeEventListener('wheel', handleWheel);
   }, [connected, sendCommand]);
 
-  // Handle keyboard with modifier support for shortcuts
-  useEffect(() => {
-    if (!connected) return;
+  
+useEffect(() => {
+  if (!connected) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const keyCode = e.keyCode;
-      
-      // Handle modifiers first
-      const modifiers = [];
-      if (e.ctrlKey && keyCode !== 17) modifiers.push(128); // KEY_LEFT_CTRL
-      if (e.shiftKey && keyCode !== 16) modifiers.push(129); // KEY_LEFT_SHIFT
-      if (e.altKey && keyCode !== 18) modifiers.push(130); // KEY_LEFT_ALT
-      if (e.metaKey && keyCode !== 91 && keyCode !== 93) modifiers.push(131); // KEY_LEFT_GUI (Windows/Cmd)
-      if (e.shiftKey && e.key === 'F12') {
-          e.preventDefault();
-          sendCommand('RST:1234');
-          return;
-      }   
-      
-      if (e.shiftKey && e.altKey && e.key === 'F10') {
-          e.preventDefault();
-          sendCommand('P:81'); // powerdown
-          return;
-      }
-      if (e.shiftKey && e.altKey && e.key === 'F11') {
-          e.preventDefault();
-          sendCommand('P:83'); // Direct HID Code: Generic Desktop System Wake Up
-          return;
-      }
+  // HID codes for modifier keys — sent directly, bypass Arduino lookup
+  const HID_LCTRL  = 224;
+  const HID_LSHIFT = 225;
+  const HID_LALT   = 226;
+  const HID_LGUI   = 227;
+  const HID_RSHIFT = 229;
 
-      if (modifiers.length > 0 && keyCode > 31 && keyCode < 127) {
-        e.preventDefault(); // Prevent browser shortcuts
-        
-        // Press modifiers
-        modifiers.forEach(mod => sendCommand(`P:${mod}`));
-        
-        // Press the key
-        if (!keysPressed.current.has(keyCode)) {
-          keysPressed.current.add(keyCode);
-          sendCommand(`P:${keyCode}`);
-        }
-      } else {
-        // Regular key press
-        if (!keysPressed.current.has(keyCode)) {
-          keysPressed.current.add(keyCode);
-          sendCommand(`P:${keyCode}`);
-        }
-      }
-    };
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const keyCode = e.keyCode;
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const keyCode = e.keyCode;
-      keysPressed.current.delete(keyCode);
-      sendCommand(`R:${keyCode}`);
-    };
+    // Special combos — intercept before anything else
+    if (e.shiftKey && e.key === 'F12') {
+      e.preventDefault();
+      sendCommand('RST:1234');
+      return;
+    }
+    if (e.shiftKey && e.altKey && e.key === 'F10') {
+      e.preventDefault();
+      sendCommand('P:81'); // Power down (raw HID, sent as-is)
+      return;
+    }
+    if (e.shiftKey && e.altKey && e.key === 'F11') {
+      e.preventDefault();
+      sendCommand('P:83'); // System wake-up (raw HID)
+      return;
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [connected, sendCommand]);
+    // Don't re-send if already held
+    if (keysPressed.current.has(keyCode)) return;
+    keysPressed.current.add(keyCode);
+
+    // Send modifier keys using their HID codes directly
+    // (Arduino keycodeToHID also handles these, but being explicit is safer)
+    if (keyCode === 16) { sendCommand(`P:${HID_LSHIFT}`); return; }
+    if (keyCode === 17) { sendCommand(`P:${HID_LCTRL}`);  return; }
+    if (keyCode === 18) { sendCommand(`P:${HID_LALT}`);   return; }
+    if (keyCode === 91 || keyCode === 93) { sendCommand(`P:${HID_LGUI}`); return; }
+
+    // Prevent browser from consuming Ctrl/Alt shortcuts
+    if (e.ctrlKey || e.altKey || e.metaKey) e.preventDefault();
+
+    // Send modifiers that are currently held but not the key itself
+    // (e.g. user holds Ctrl, presses C — send Ctrl before C)
+    if (e.ctrlKey)  sendCommand(`P:${HID_LCTRL}`);
+    if (e.altKey)   sendCommand(`P:${HID_LALT}`);
+    if (e.metaKey)  sendCommand(`P:${HID_LGUI}`);
+
+    // Shift: send BEFORE the key so the HID host applies shift correctly.
+    // Use e.getModifierState to distinguish physical left/right shift if needed.
+    if (e.shiftKey) {
+      const shiftHid = e.location === 2 ? HID_RSHIFT : HID_LSHIFT;
+      sendCommand(`P:${shiftHid}`);
+    }
+
+    // Send the key itself — Arduino maps keyCode → HID
+    sendCommand(`P:${keyCode}`);
+  };
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    const keyCode = e.keyCode;
+    keysPressed.current.delete(keyCode);
+
+    // Modifier keys: release by HID code
+    if (keyCode === 16) { sendCommand(`R:${HID_LSHIFT}`); return; }
+    if (keyCode === 17) { sendCommand(`R:${HID_LCTRL}`);  return; }
+    if (keyCode === 18) { sendCommand(`R:${HID_LALT}`);   return; }
+    if (keyCode === 91 || keyCode === 93) { sendCommand(`R:${HID_LGUI}`); return; }
+
+    sendCommand(`R:${keyCode}`);
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
+}, [connected, sendCommand]);
 
   // Initialize video capture
   useEffect(() => {
